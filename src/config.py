@@ -12,13 +12,17 @@ load_dotenv()
 class UnstructuredAPIConfig:
     """Configuration for Unstructured API."""
     api_key: Optional[str] = None
-    api_url: str = "https://api.unstructured.io/general/v0/general"
-    strategy: str = "hi_res"  # "fast", "hi_res", or "auto"
+    api_url: str = "https://api.unstructuredapp.io/general/v0/general"  # Official default URL
+    strategy: str = "fast"  # "fast", "hi_res", "auto", "ocr_only"
     extract_image_block_types: List[str] = field(default_factory=lambda: ["Image", "Table"])
 
     def __post_init__(self):
         if self.api_key is None:
             self.api_key = os.getenv("UNSTRUCTURED_API_KEY")
+        # Allow override from environment variable
+        url_from_env = os.getenv("UNSTRUCTURED_API_URL")
+        if url_from_env:
+            self.api_url = url_from_env
 
 
 @dataclass
@@ -44,7 +48,7 @@ class ChunkingConfig:
     max_chunk_length: int = 1000
     return_tokens: bool = True
     return_chunks: bool = True
-    use_jina_api_chunking: bool = True  # Use Jina API for better chunking (recommended)
+    use_jina_api_chunking: bool = False  # API creates too many chunks; use local method for now
 
 
 @dataclass
@@ -90,28 +94,28 @@ class RagasConfig:
 class EvaluationConfig:
     """Configuration for evaluation settings."""
     test_queries: List[str] = field(default_factory=lambda: [
-        "What is an ally according to the DIB definition?",
-        "What is the difference between a mentor and a sponsor?",
-        "What are the current DIB goals regarding geographic diversity?",
-        "What skills and behaviors should effective allies exhibit?",
-        "What is the role of a sponsor at GitLab and what job grade is required?",
-        "How does GitLab define diversity, inclusion, and belonging?",
-        "What are the four phases of a successful sponsorship relationship?",
-        "What inclusive behaviors should managers practice at GitLab?",
-        "What is performative allyship and why should it be avoided?",
-        "What are the key components of DIB roundtables and how are they structured?",
+        "What is the main innovation introduced in the Transformer architecture?",
+        "What does BERT stand for and what is its key training objective?",
+        "How many parameters does GPT-3 have and what makes it different from GPT-2?",
+        "What is the main contribution of ResNet and what problem does it solve?",
+        "What are the two main components of RAG and how do they work together?",
+        "What is multi-head attention and why is it used in Transformers?",
+        "What is the difference between BERT's pre-training tasks: MLM and NSP?",
+        "What is few-shot learning in the context of GPT-3?",
+        "What is the skip connection or residual connection in ResNet?",
+        "How does RAG combine retrieval and generation for question answering?",
     ])
     ground_truths: List[str] = field(default_factory=lambda: [
-        "A diversity, inclusion and belonging ally is someone who is willing to take action in support of another person, in order to remove barriers that impede that person from contributing their skills and talents in the workplace or community. Being an ally is a verb, meaning you proactively and purposefully take action.",
-        "While a mentor is someone who has knowledge and will share it with you, a sponsor is a person who has power and will use it for you. Mentoring is about providing guidance based on personal experience, while sponsorship is about using influence and power to advocate for career advancement opportunities and provide visibility to senior leaders.",
-        "GitLab does not currently have a company-wide goal for geographic diversity and will focus on increasing Director+ representation outside of the United States, as team member representation is currently outpacing leadership representation. In FY24, they will reevaluate the need for director level+ representation goals outside of the United States.",
-        "Effective allies should exhibit active listening (neutral, nonjudgmental, patient, asking questions), empathy and emotional intelligence, active learning about other experiences, humility (non-defensive, willingness to take feedback), courage (comfortable getting uncomfortable, speak up where others don't), self-awareness (own and use privilege), and being action-oriented (see something, say something).",
-        "A sponsor at GitLab is someone who has power and influence and will use that power to advocate, elevate and impact a team member's opportunities and career progression. The sponsor must be a senior leader at a minimum job grade 10+ who is not the sponsee's direct manager, must be a people manager or manager of managers, and must have been at GitLab for 6+ months.",
-        "Diversity includes all the differences we each have, whether it be where we grew up, where we went to school, experiences, age, race, gender, national origin, and things we can and cannot see. Inclusion is understanding or recognizing all these differences and inviting someone to be a part of things and collaborate. Belonging is when you feel your insights and contributions are valued, and you can bring your full self to work.",
-        "The four phases of successful sponsorship are: Build (take time to build a solid relationship, commit to regular 1-1s, understand career development plan), Develop (become action and capability focused, help guide on areas of improvement), Commit (both parties agree to move forward with sponsorship and advocating), and Advocate (sponsor actively and intentionally advocates for sponsee's continued career development and advancement).",
-        "Managers should include and seek input from team members across a wide variety of backgrounds, practice active listening, make a habit of asking questions, address misunderstandings quickly, ensure all voices are heard, assume positive intent, be mindful of meeting times across regions, ask employees what pronouns they use, and be a role model by being authentic and owning up to mistakes.",
-        "Performative allyship refers to allyship that is done to increase a person's social capital rather than because of a person's devotion to a cause. For example, some people used hashtags during social movements without actually bringing more awareness or trying to effect change. It should be avoided because it doesn't create real impact and can undermine genuine DIB efforts.",
-        "DIB roundtables are designed to build deeper connections and develop safe spaces to discuss DIB related issues. They can be DIB Team programmed (quarterly with pre-defined topics), self-organized by TMRGs or team members, or manager-organized. A typical roundtable lasts 50 minutes: 10 minutes for topic introduction, 30 minutes for small group discussions of 5-6 team members, and 10 minutes for debrief. Ground rules include assuming positive intent, avoiding multitasking, and maintaining confidentiality.",
+        "The main innovation in the Transformer architecture is the self-attention mechanism, which allows the model to process all positions in the input sequence in parallel, eliminating the need for recurrent connections. The Transformer relies entirely on attention mechanisms to draw global dependencies between input and output, making it more efficient and parallelizable than RNNs.",
+        "BERT stands for Bidirectional Encoder Representations from Transformers. Its key training objective is masked language modeling (MLM), where random tokens in the input are masked and the model learns to predict them based on bidirectional context. BERT also uses next sentence prediction (NSP) as a secondary objective.",
+        "GPT-3 has 175 billion parameters, making it significantly larger than GPT-2 which had 1.5 billion parameters. The key difference is that GPT-3 demonstrates strong few-shot learning capabilities, meaning it can perform many tasks with just a few examples in the prompt, without requiring fine-tuning.",
+        "The main contribution of ResNet is the introduction of residual or skip connections, which allow gradients to flow directly through the network. This solves the vanishing gradient problem and enables training of very deep networks (50, 101, or even 152 layers) that would otherwise be difficult or impossible to train.",
+        "RAG has two main components: a retriever and a generator. The retriever uses dense passage retrieval to find relevant documents from a knowledge source, and the generator (typically a seq2seq model) uses these retrieved documents as additional context to generate the final answer. They work together end-to-end to combine parametric and non-parametric memory.",
+        "Multi-head attention is a mechanism where the attention operation is performed multiple times in parallel with different learned linear projections. Each attention head can focus on different aspects of the input, allowing the model to jointly attend to information from different representation subspaces at different positions. The outputs are concatenated and linearly transformed.",
+        "MLM (Masked Language Modeling) involves randomly masking 15% of tokens in the input and training the model to predict them based on bidirectional context. NSP (Next Sentence Prediction) is a binary classification task where the model predicts whether two sentences appear consecutively in the original text. MLM enables bidirectional learning while NSP helps with understanding sentence relationships.",
+        "Few-shot learning in GPT-3 refers to the model's ability to perform a new task given only a few examples in the prompt, without any gradient updates or fine-tuning. The model is given a task description and a few input-output examples (typically 10-100), and can then perform the task on new inputs. This is different from zero-shot (no examples) and one-shot (one example) learning.",
+        "A skip connection or residual connection in ResNet is a direct pathway that bypasses one or more layers by adding the input of a block directly to its output. Mathematically, instead of learning H(x), the network learns F(x) = H(x) - x, making it easier to learn identity mappings. This allows gradients to flow backward through the network more easily.",
+        "RAG combines retrieval and generation by first using a neural retriever (DPR - Dense Passage Retrieval) to find relevant documents from a knowledge base given a question. These retrieved documents are then passed along with the question to a sequence-to-sequence generator model (BART), which uses both the question and the retrieved context to generate the final answer. The retriever and generator are trained end-to-end.",
     ])
     top_k: int = 5
     batch_size: int = 10

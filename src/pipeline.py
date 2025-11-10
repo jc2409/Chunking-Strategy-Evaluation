@@ -70,7 +70,35 @@ class ChunkingPipeline:
         print(f"{'='*60}\n")
 
         all_chunks = []
+        all_embeddings = []
 
+        # Late chunking requires special handling: chunk and embed per document
+        if strategy == "late":
+            for doc in documents:
+                print(f"Chunking: {doc.source}")
+
+                # Chunk the document once
+                chunks, chunk_texts, span_annotations = self.late_chunker.chunk_with_late_chunking(doc)
+
+                # Combine document elements for embedding
+                full_text = self.late_chunker._combine_elements(doc.elements)
+
+                # Generate embeddings with late chunking (uses span annotations)
+                embeddings = self.embedder.embed_with_late_chunking(
+                    full_text,
+                    span_annotations
+                )
+
+                all_chunks.extend(chunks)
+                all_embeddings.extend(embeddings)
+
+            print(f"Created {len(all_chunks)} chunks")
+            print("Generating embeddings...")
+            print(f"Generated {len(all_embeddings)} embeddings")
+
+            return all_chunks, all_embeddings
+
+        # Traditional chunking strategies
         for doc in documents:
             print(f"Chunking: {doc.source}")
 
@@ -80,8 +108,6 @@ class ChunkingPipeline:
                 chunks = self.traditional_chunker.chunk_recursive(doc)
             elif strategy == "semantic":
                 chunks = self.traditional_chunker.chunk_semantic(doc)
-            elif strategy == "late":
-                chunks, _, _ = self.late_chunker.chunk_with_late_chunking(doc)
             else:
                 raise ValueError(f"Unknown strategy: {strategy}")
 
@@ -91,36 +117,11 @@ class ChunkingPipeline:
 
         # Generate embeddings
         print("Generating embeddings...")
-        if strategy == "late":
-            # For late chunking, we need to handle it differently
-            embeddings = self._embed_late_chunking(documents)
-        else:
-            # Traditional embedding
-            embeddings = self.embedder.embed_chunks_traditional(all_chunks)
+        embeddings = self.embedder.embed_chunks_traditional(all_chunks)
 
         print(f"Generated {len(embeddings)} embeddings")
 
         return all_chunks, embeddings
-
-    def _embed_late_chunking(self, documents):
-        """Handle embedding for late chunking strategy."""
-        all_embeddings = []
-
-        for doc in documents:
-            chunks, chunk_texts, span_annotations = self.late_chunker.chunk_with_late_chunking(doc)
-
-            # Combine document elements
-            full_text = self.late_chunker._combine_elements(doc.elements)
-
-            # Get embeddings with late chunking
-            embeddings = self.embedder.embed_with_late_chunking(
-                full_text,
-                span_annotations
-            )
-
-            all_embeddings.extend(embeddings)
-
-        return all_embeddings
 
     def ingest_to_vector_store(self, strategy: str, chunks, embeddings):
         """
