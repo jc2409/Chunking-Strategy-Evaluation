@@ -269,11 +269,14 @@ chunking-benchmark/
 ### 4. Late Chunking ⭐
 - **Method**: Embed full document with local model, then pool embeddings by chunks
 - **Implementation**: Follows [Jina AI's late chunking paper](https://arxiv.org/abs/2409.04701)
+- **Chunking Options**:
+  - **Jina API** (recommended): Uses https://tokenize.jina.ai/ for smarter chunking
+  - **Local**: Simple sentence-based splitting using periods
 - **Pros**: Maximum context preservation, best retrieval quality
 - **How it works**:
   1. Tokenize full document
   2. Get token embeddings from model
-  3. Pool embeddings according to sentence boundaries
+  3. Pool embeddings according to chunk boundaries (from API or local)
   4. Each chunk has full document context!
 - **Best for**: When retrieval quality is critical
 
@@ -327,7 +330,12 @@ class ChunkingConfig:
     fixed_chunk_size: int = 512  # Characters per chunk
     chunk_overlap: int = 50      # Overlap between chunks
     max_chunk_length: int = 1000 # Max tokens for late chunking
+    use_jina_api_chunking: bool = True  # Use Jina API (recommended) vs local sentence splitting
 ```
+
+**Late Chunking Method Selection:**
+- `use_jina_api_chunking: True` (default): Uses Jina's official API for smarter, context-aware chunking
+- `use_jina_api_chunking: False`: Uses local sentence-based splitting (faster, no API calls)
 
 ### Evaluation Queries
 

@@ -118,12 +118,13 @@ class ChunkingEvaluator:
                 embeddings=self.azure_embeddings
             )
 
+            # Extract mean scores from results (Ragas returns per-question scores)
             scores = {
                 'strategy': strategy,
-                'context_precision': results['context_precision'],
-                'context_recall': results['context_recall'],
-                'faithfulness': results['faithfulness'],
-                'answer_relevancy': results['answer_relevancy'],
+                'context_precision': float(np.mean(results['context_precision']) if isinstance(results['context_precision'], list) else results['context_precision']),
+                'context_recall': float(np.mean(results['context_recall']) if isinstance(results['context_recall'], list) else results['context_recall']),
+                'faithfulness': float(np.mean(results['faithfulness']) if isinstance(results['faithfulness'], list) else results['faithfulness']),
+                'answer_relevancy': float(np.mean(results['answer_relevancy']) if isinstance(results['answer_relevancy'], list) else results['answer_relevancy']),
             }
 
             print(f"\nResults for {strategy}:")

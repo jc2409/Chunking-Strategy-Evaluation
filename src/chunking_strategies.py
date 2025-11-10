@@ -210,10 +210,10 @@ class LateChunker:
 
     def chunk_with_late_chunking(self, document: Document) -> Tuple[List[Chunk], List[str], List[Tuple[int, int]]]:
         """
-        Late chunking using local tokenizer.
+        Late chunking using local tokenizer or Jina API.
 
         This method:
-        1. Chunks text by sentences using the tokenizer
+        1. Chunks text by sentences using the tokenizer or Jina API
         2. Returns chunks with token-level span annotations for late pooling
 
         Args:
@@ -225,8 +225,11 @@ class LateChunker:
         # Combine all text elements
         full_text = self._combine_elements(document.elements)
 
-        # Get chunks and span annotations using local tokenizer
-        chunk_texts, span_annotations = self._chunk_by_sentences(full_text)
+        # Get chunks and span annotations using configured method
+        if self.chunking_config.use_jina_api_chunking:
+            chunk_texts, span_annotations = self._chunk_by_tokenizer_api(full_text)
+        else:
+            chunk_texts, span_annotations = self._chunk_by_sentences(full_text)
 
         # Create Chunk objects
         chunks = []
@@ -286,6 +289,81 @@ class LateChunker:
         ]
 
         return chunks, span_annotations
+
+    def _chunk_by_tokenizer_api(self, input_text: str) -> Tuple[List[str], List[Tuple[int, int]]]:
+        """
+        Split text using Jina's official tokenization API.
+        This is the recommended approach for late chunking with Jina embeddings.
+
+        The API returns character positions, which we convert to token positions
+        for compatibility with the late chunking pooling method.
+
+        Args:
+            input_text: Text to split
+
+        Returns:
+            Tuple of (chunks, span_annotations in token positions)
+        """
+        import requests
+
+        # Define the API endpoint and payload
+        url = 'https://tokenize.jina.ai/'
+        payload = {
+            "content": input_text,
+            "return_chunks": "true",
+            "max_chunk_length": str(self.chunking_config.max_chunk_length)
+        }
+
+        try:
+            # Make the API request
+            response = requests.post(url, json=payload, timeout=30)
+            response.raise_for_status()
+            response_data = response.json()
+
+            # Extract chunks and character positions from the response
+            chunks = response_data.get("chunks", [])
+            char_positions = response_data.get("chunk_positions", [])
+
+            if not chunks or not char_positions:
+                raise ValueError("API returned empty chunks or positions")
+
+            # Convert character positions to token positions
+            # We need to tokenize the full text to get the mapping
+            inputs = self.tokenizer(input_text, return_tensors='pt', return_offsets_mapping=True)
+            token_offsets = inputs['offset_mapping'][0]  # Maps tokens to character positions
+
+            span_annotations = []
+            for char_start, char_end in char_positions:
+                # Find token indices that correspond to these character positions
+                token_start = None
+                token_end = None
+
+                for token_idx, (tok_char_start, tok_char_end) in enumerate(token_offsets):
+                    # Find the first token that starts at or after char_start
+                    if token_start is None and tok_char_start >= char_start:
+                        token_start = token_idx
+
+                    # Find the last token that ends at or before char_end
+                    if tok_char_end <= char_end:
+                        token_end = token_idx + 1
+
+                    if token_start is not None and token_end is not None:
+                        break
+
+                # Fallback to reasonable defaults if not found
+                if token_start is None:
+                    token_start = 0
+                if token_end is None:
+                    token_end = len(token_offsets)
+
+                span_annotations.append((token_start, token_end))
+
+            print(f"API chunking: {len(chunks)} chunks from Jina API")
+            return chunks, span_annotations
+
+        except Exception as e:
+            print(f"API chunking failed ({e}), falling back to local sentence splitting")
+            return self._chunk_by_sentences(input_text)
 
     def _combine_elements(self, elements: List[DocumentElement]) -> str:
         """Combine document elements into a single text."""
