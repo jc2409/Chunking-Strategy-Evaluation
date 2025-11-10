@@ -1,0 +1,39 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# API Keys and sensitive data
+.env
+*.key
+*.pem
+credentials.json
+
+# Output files
+evaluation_results.csv
+*.log
+
+# Temporary files
+*.tmp
+*.cache
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Data directories (optional - uncomment if you want to ignore data)
+# data/
+# documents/
+# output/
