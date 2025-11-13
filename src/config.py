@@ -33,6 +33,16 @@ class JinaConfig:
     local_model_name: str = "jinaai/jina-embeddings-v3"
     device: str = "cpu"  # or "cuda" if GPU available
 
+    # API settings
+    use_api: bool = True  # Use Jina API instead of local model
+    api_key: Optional[str] = None
+    api_task: str = "retrieval.passage"  # retrieval.passage, retrieval.query, text-matching, classification, separation
+    api_dimensions: int = 1024  # Max 1024 for jina-embeddings-v3
+
+    def __post_init__(self):
+        if self.api_key is None:
+            self.api_key = os.getenv("JINA_API_KEY")
+
 
 @dataclass
 class ChunkingConfig:

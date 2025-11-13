@@ -7,7 +7,7 @@ from typing import List
 from config import get_config
 from document_loader import DocumentLoader
 from chunking_strategies import TraditionalChunker, LateChunker
-from embeddings import JinaEmbedder
+from embeddings import JinaEmbedder, JinaAPIEmbedder
 from vector_store import MultiStrategyVectorStore
 from evaluation import ChunkingEvaluator
 
@@ -23,7 +23,15 @@ class ChunkingPipeline:
         self.doc_loader = DocumentLoader(self.config.unstructured)
         self.traditional_chunker = TraditionalChunker(self.config.chunking)
         self.late_chunker = LateChunker(self.config.jina, self.config.chunking)
-        self.embedder = JinaEmbedder(self.config.jina)
+
+        # Choose embedder based on configuration
+        if self.config.jina.use_api:
+            print("Using Jina API for embeddings")
+            self.embedder = JinaAPIEmbedder(self.config.jina)
+        else:
+            print("Using local Jina model for embeddings")
+            self.embedder = JinaEmbedder(self.config.jina)
+
         self.vector_store = MultiStrategyVectorStore(self.config.pinecone)
 
     def load_documents(self, source: str, recursive: bool = True):
@@ -80,14 +88,21 @@ class ChunkingPipeline:
                 # Chunk the document once
                 chunks, chunk_texts, span_annotations = self.late_chunker.chunk_with_late_chunking(doc)
 
-                # Combine document elements for embedding
-                full_text = self.late_chunker._combine_elements(doc.elements)
-
-                # Generate embeddings with late chunking (uses span annotations)
-                embeddings = self.embedder.embed_with_late_chunking(
-                    full_text,
-                    span_annotations
-                )
+                # Generate embeddings with late chunking
+                if isinstance(self.embedder, JinaAPIEmbedder):
+                    # API-based: pass chunk_texts directly (API handles concatenation)
+                    embeddings = self.embedder.embed_with_late_chunking(
+                        chunk_texts,
+                        task=self.config.jina.api_task,
+                        dimensions=self.config.jina.api_dimensions
+                    )
+                else:
+                    # Local model: pass full_text and span_annotations
+                    full_text = self.late_chunker._combine_elements(doc.elements)
+                    embeddings = self.embedder.embed_with_late_chunking(
+                        full_text,
+                        span_annotations
+                    )
 
                 all_chunks.extend(chunks)
                 all_embeddings.extend(embeddings)
@@ -117,7 +132,16 @@ class ChunkingPipeline:
 
         # Generate embeddings
         print("Generating embeddings...")
-        embeddings = self.embedder.embed_chunks_traditional(all_chunks)
+        if isinstance(self.embedder, JinaAPIEmbedder):
+            # API-based: pass chunks with task and dimensions
+            embeddings = self.embedder.embed_chunks_traditional(
+                all_chunks,
+                task=self.config.jina.api_task,
+                dimensions=self.config.jina.api_dimensions
+            )
+        else:
+            # Local model
+            embeddings = self.embedder.embed_chunks_traditional(all_chunks)
 
         print(f"Generated {len(embeddings)} embeddings")
 
@@ -234,7 +258,16 @@ class ChunkingPipeline:
                 continue
 
             # Embed query
-            query_embedding = self.embedder.embed_query(query)
+            if isinstance(self.embedder, JinaAPIEmbedder):
+                # API-based: use retrieval.query task
+                query_embedding = self.embedder.embed_query(
+                    query,
+                    task="retrieval.query",
+                    dimensions=self.config.jina.api_dimensions
+                )
+            else:
+                # Local model
+                query_embedding = self.embedder.embed_query(query)
 
             # Query all strategies
             print(f"\n{'='*60}")

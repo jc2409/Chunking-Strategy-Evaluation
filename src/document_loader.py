@@ -36,21 +36,14 @@ class DocumentLoader:
         '.eml', '.msg', '.rtf', '.odt', '.epub'
     }
 
-    # Simple text files that can be read directly without API
-    SIMPLE_TEXT_EXTENSIONS = {
-        '.txt', '.md', '.py', '.js', '.java', '.cpp', '.c', '.h',
-        '.sh', '.yaml', '.yml', '.json', '.xml', '.html', '.css'
-    }
-
     def __init__(self, config: UnstructuredAPIConfig):
         """Initialize the document loader with API configuration."""
         self.config = config
-        # API key is optional - will fall back to simple text reading for supported files
         self.use_api = bool(self.config.api_key)
 
     def load(self, file_path: str) -> Document:
         """
-        Load a document from a file path using Unstructured API or fallback.
+        Load a document from a file path using Unstructured API.
 
         Args:
             file_path: Path to the file to load
@@ -71,20 +64,11 @@ class DocumentLoader:
         if extension not in self.SUPPORTED_EXTENSIONS:
             raise ValueError(f"Unsupported file format: {extension}")
 
-        # Try API first for complex documents, or if it's a simple text file without API
-        if extension in self.SIMPLE_TEXT_EXTENSIONS and not self.use_api:
-            # Use simple text reading for basic files
-            elements = self._load_simple_text(path)
-        else:
-            # Try Unstructured API, fall back to simple reading on error
-            try:
-                elements = self._call_unstructured_api(path)
-            except Exception as e:
-                if extension in self.SIMPLE_TEXT_EXTENSIONS:
-                    print(f"API failed for {path.name}, using fallback text reader")
-                    elements = self._load_simple_text(path)
-                else:
-                    raise e
+        # Unstructured API
+        try:
+            elements = self._call_unstructured_api(path)
+        except Exception as e:
+            raise e
 
         metadata = {
             'source': str(path),

@@ -15,7 +15,7 @@ from ragas.metrics import (
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 
 from config import Config
-from embeddings import JinaEmbedder
+from embeddings import JinaEmbedder, JinaAPIEmbedder
 from vector_store import MultiStrategyVectorStore
 
 
@@ -25,7 +25,13 @@ class ChunkingEvaluator:
     def __init__(self, config: Config):
         """Initialize evaluator with configuration."""
         self.config = config
-        self.embedder = JinaEmbedder(config.jina)
+
+        # Choose embedder based on configuration
+        if config.jina.use_api:
+            self.embedder = JinaAPIEmbedder(config.jina)
+        else:
+            self.embedder = JinaEmbedder(config.jina)
+
         self.vector_store = MultiStrategyVectorStore(config.pinecone)
 
         # Initialize LLM for Ragas (using Azure OpenAI)
@@ -71,7 +77,14 @@ class ChunkingEvaluator:
 
         for question in questions:
             # Embed query
-            query_embedding = self.embedder.embed_query(question)
+            if isinstance(self.embedder, JinaAPIEmbedder):
+                query_embedding = self.embedder.embed_query(
+                    question,
+                    task="retrieval.query",
+                    dimensions=self.config.jina.api_dimensions
+                )
+            else:
+                query_embedding = self.embedder.embed_query(question)
 
             # Retrieve top-k chunks
             results = self.vector_store.query_strategy(
@@ -245,7 +258,15 @@ Answer:"""
             import time
             start = time.time()
 
-            query_embedding = self.embedder.embed_query(question)
+            if isinstance(self.embedder, JinaAPIEmbedder):
+                query_embedding = self.embedder.embed_query(
+                    question,
+                    task="retrieval.query",
+                    dimensions=self.config.jina.api_dimensions
+                )
+            else:
+                query_embedding = self.embedder.embed_query(question)
+
             results = self.vector_store.query_strategy(
                 strategy,
                 query_embedding,
